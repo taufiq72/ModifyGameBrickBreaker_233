@@ -183,3 +183,41 @@ class Paddle(GameObject):
             super(Paddle, self).move(offset, 0)
             if self.ball is not None:
                 self.ball.move(offset, 0)
+
+class Brick(GameObject):
+    # --- MODIFIKASI: Penggunaan palet warna Flat UI modern ---
+    COLORS = {1: "#e74c3c", 2: "#3498db", 3: "#2ecc71"}
+
+    def __init__(self, canvas, x, y, hits):
+        self.width = 75
+        self.height = 20
+        self.hits = hits
+        color = Brick.COLORS[hits]
+        item = canvas.create_rectangle(
+            x - self.width / 2,
+            y - self.height / 2,
+            x + self.width / 2,
+            y + self.height / 2,
+            fill=color,
+            outline="#ffffff",
+            width=1,
+            tags="brick",
+        )
+        super(Brick, self).__init__(canvas, item)
+
+    def hit(self):
+        # --- MODIFIKASI (BARU): Memicu pembuatan ledakan partikel saat terkena pukulan ---
+        coords = self.get_position()
+        center_x = (coords[0] + coords[2]) * 0.5
+        center_y = (coords[1] + coords[3]) * 0.5
+        color = Brick.COLORS[self.hits]
+
+        game_instance = self.canvas.master
+        if hasattr(game_instance, "create_explosion"):
+            game_instance.create_explosion(center_x, center_y, color)
+
+        self.hits -= 1
+        if self.hits == 0:
+            self.delete()
+        else:
+            self.canvas.itemconfig(self.item, fill=Brick.COLORS[self.hits])
