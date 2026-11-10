@@ -221,3 +221,127 @@ class Brick(GameObject):
             self.delete()
         else:
             self.canvas.itemconfig(self.item, fill=Brick.COLORS[self.hits])
+
+class Game(tk.Frame):
+
+    def __init__(self, master):
+        super(Game, self).__init__(master)
+        self.lives = 3
+        self.width = 610
+        self.height = 400
+        # --- MODIFIKASI: Warna latar canvas diubah ke Dark Slate (#2c3e50) ---
+        self.canvas = tk.Canvas(
+            self, bg="#2c3e50", width=self.width, height=self.height
+        )
+        self.canvas.pack()
+        self.pack()
+
+        self.items = {}
+        # --- MODIFIKASI (BARU): List penampung objek partikel ---
+        self.particles = []
+        self.ball = None
+        # --- MODIFIKASI: Penyesuaian posisi Y paddle agar lebih presisi ---
+        self.paddle = Paddle(self.canvas, self.width / 2, 350)
+        self.items[self.paddle.item] = self.paddle
+
+        for x in range(5, self.width - 5, 75):
+            self.add_brick(x + 37.5, 50, 3)
+            self.add_brick(x + 37.5, 75, 2)
+            self.add_brick(x + 37.5, 100, 1)
+
+        self.hud = None
+        self.setup_game()
+        self.canvas.focus_set()
+        # --- MODIFIKASI: Kecepatan gerakan paddle dinaikkan dari 10 ke 15 ---
+        self.canvas.bind("<Left>", lambda _: self.paddle.move(-15))
+        self.canvas.bind("<Right>", lambda _: self.paddle.move(15))
+
+    def setup_game(self):
+        self.add_ball()
+        self.update_lives_text()
+        self.text = self.draw_text(300, 200, "Press Space to start")
+        self.canvas.bind("<space>", lambda _: self.start_game())
+
+    def add_ball(self):
+        if self.ball is not None:
+            # --- MODIFIKASI: Clear trails sebelum menghapus objek bola lama ---
+            self.ball.clear_trails()
+            self.ball.delete()
+        paddle_coords = self.paddle.get_position()
+        x = (paddle_coords[0] + paddle_coords[2]) * 0.5
+        # --- MODIFIKASI: Penyesuaian posisi awal bola mengikuti tinggi paddle baru ---
+        self.ball = Ball(self.canvas, x, 334)
+        self.paddle.set_ball(self.ball)
+
+    def add_brick(self, x, y, hits):
+        brick = Brick(self.canvas, x, y, hits)
+        self.items[brick.item] = brick
+
+    def draw_text(self, x, y, text, size=30):
+        # --- MODIFIKASI: Font standar Helvetica bold dengan warna terang (#ecf0f1) ---
+        font = ("Helvetica", size, "bold")
+        return self.canvas.create_text(
+            x, y, text=text, font=font, fill="#ecf0f1"
+        )
+
+    def update_lives_text(self):
+        text = "Lives: %s" % self.lives
+        if self.hud is None:
+            self.hud = self.draw_text(60, 20, text, 14)
+        else:
+            self.canvas.itemconfig(self.hud, text=text)
+
+    # --- MODIFIKASI (BARU): Fungsi pemicu pembuatan 12 partikel ledakan ---
+    def create_explosion(self, x, y, color):
+        for _ in range(12):
+            self.particles.append(Particle(self.canvas, x, y, color))
+
+    # --- MODIFIKASI (BARU): Fungsi pembaruan siklus hidup partikel ---
+    def update_particles(self):
+        active_particles = []
+        for p in self.particles:
+            if p.update():
+                active_particles.append(p)
+        self.particles = active_particles
+
+    def start_game(self):
+        self.canvas.unbind("<space>")
+        self.canvas.delete(self.text)
+        self.paddle.ball = None
+        self.game_loop()
+
+    def game_loop(self):
+        self.check_collisions()
+        # --- MODIFIKASI (BARU): Update animasi partikel di setiap frame loop ---
+        self.update_particles()
+
+        num_bricks = len(self.canvas.find_withtag("brick"))
+        if num_bricks == 0:
+            self.draw_text(300, 200, "YOU WIN!")
+        elif self.ball.get_position()[3] >= self.height:
+            # --- MODIFIKASI: Membersihkan jejak bola saat kalah/mati ---
+            self.ball.clear_trails()
+            self.lives -= 1
+            if self.lives < 0:
+                self.draw_text(300, 200, "GAME OVER!")
+            else:
+                self.after(1000, self.setup_game)
+        else:
+            self.ball.update()
+            # --- MODIFIKASI: Penyesuaian frame rate dari 50 ms ke 30 ms (~33 FPS) ---
+            self.after(30, self.game_loop)
+
+    def check_collisions(self):
+        ball_coords = self.ball.get_position()
+        items = self.canvas.find_overlapping(*ball_coords)
+
+        destroyed_items = [
+            item_id
+            for item_id in self.items
+            if item_id not in self.canvas.find_all()
+        ]
+        for item_id in destroyed_items:
+            del self.items[item_id]
+
+        objects = [self.items[x] for x in items if x in self.items]
+        self.ball.collide(objects)
