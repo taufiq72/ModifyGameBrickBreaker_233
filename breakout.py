@@ -16,3 +16,32 @@ class GameObject(object):
 
     def delete(self):
         self.canvas.delete(self.item)
+
+# --- MODIFIKASI (BARU): Kelas Particle untuk efek ledakan bata ---
+class Particle(GameObject):
+
+    def __init__(self, canvas, x, y, color):
+        self.radius = random.randint(2, 4)
+        item = canvas.create_oval(
+            x - self.radius,
+            y - self.radius,
+            x + self.radius,
+            y + self.radius,
+            fill=color,
+            outline="",
+        )
+        super(Particle, self).__init__(canvas, item)
+        # Menghitung arah gerak partikel secara acak ke segala arah
+        angle = random.uniform(0, 2 * math.pi)
+        speed = random.uniform(2, 6)
+        self.vx = math.cos(angle) * speed
+        self.vy = math.sin(angle) * speed
+        self.life = random.randint(8, 15)  # Umur hidup partikel dalam frame
+
+    def update(self):
+        self.move(self.vx, self.vy)
+        self.life -= 1
+        if self.life <= 0:
+            self.delete()
+            return False
+        return True
